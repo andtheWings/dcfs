@@ -5,5 +5,25 @@ date: "1/21/2022"
 output: html_document
 ---
 
+## Dependencies
+
+```{r}
+pacman::p_load(
+    ggmap, #spatial visualization with Google Maps and OpenStreetMap
+    janitor, #simple functions for examining and cleaning dirty data
+    readxl, #get data out of excel and into R
+    sf, #set of standards that specify a common storage and access model of geographic features
+    tidycensus, #allows users to interface with a select number of the US Census Bureau’s data APIs
+    tidyverse #opinionated collection of R packages designed for data science
+)
+```
+
+## Load Data
+
+```{r}
+raw <- read_excel("data/Cook County Hospital Data Pull - 8-1-16 - 7-31-21.xlsx")
+
+glimpse(raw)
+```
 
 
