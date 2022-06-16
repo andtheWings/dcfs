@@ -8,3 +8,7 @@
 data/
 
 _targets/
+
+.Rproj.user.backup/
+
+*.html
