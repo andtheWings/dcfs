@@ -1,7 +1,9 @@
 library(targets)
 
-source("R/wrangling_addresses.R")
-source("R/wrangling_incidents.R")
+sapply(
+    paste0("R/", list.files("R/")),
+    source
+)
 
 tar_option_set(
     packages = c(
@@ -11,6 +13,18 @@ tar_option_set(
 )
 
 list(
+    # Illinois County Boundaries
+    tar_target(
+        illinois_county_boundaries_file,
+        # Downloaded on 06/25/2022 from...
+        # https://hub.arcgis.com/datasets/IDOT::illinois-counties/explore
+        "data/Illinois_Counties.geojson",
+        format = "file"
+    ),
+    tar_target(
+        illinois_county_boundaries,
+        st_read(illinois_county_boundaries_file)
+    ),
     # Cook County Boundary
     tar_target(
         cook_county_boundary_file,
@@ -21,6 +35,18 @@ list(
     tar_target(
         cook_county_boundary,
         st_read(cook_county_boundary_file)
+    ),
+    # Peoria County Boundary
+    tar_target(
+        peoria_county_boundary_file,
+        # Downloaded on 06/25/2022 from...
+        # https://data-peoriacountygis.opendata.arcgis.com/datasets/county-boundary/explore
+        "data/Peoria_County_Boundary.geojson",
+        format = "file"
+    ),
+    tar_target(
+        peoria_county_boundary,
+        st_read(peoria_county_boundary_file)
     ),
     # Hospital Addresses
     tar_target(
