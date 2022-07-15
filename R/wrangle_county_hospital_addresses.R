@@ -23,5 +23,3 @@ wrangle_county_hospital_addresses <-
         
         return(df1)
     }
-
-

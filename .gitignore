@@ -12,3 +12,5 @@ _targets/
 .Rproj.user.backup/
 
 *.html
+
+widgets/

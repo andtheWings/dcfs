@@ -1,23 +1,9 @@
----
-title: "Cook County DCFS Analysis"
-author: "Daniel P. Riggins, MD"
-date: "`r Sys.Date()`"
-output: html_document
----
-
-## Dependencies
-
-```{r message=FALSE, warning=FALSE}
-library(targets)
-library(leaflet)
-library(leaflet.extras)
-library(tidyverse)
-library(sf)
-tar_load_everything()
-```
-
-```{r}
-hospital_address_variations <- c(
+wrangle_incidents <- function(incidents_raw_df, peoria_vermilion_incidents_post_geocode_raw_df) {
+    
+    # Derived from cross-referencing incidents_raw and hospital_addresses_raw
+    # Consider filtering by hospital boundary as alternative:
+    # https://hub-cookcountyil.opendata.arcgis.com/datasets/ac3888f022ab458da449e4634992ea68_8/explore
+    hospital_address_variations <- c(
         # Cook County
             # Alexian Brothers Behavioral Health Hospital
             "1650 Moon Lake Blvd",
@@ -225,46 +211,104 @@ hospital_address_variations <- c(
             "530 NE Glen Oak, OSF",
             "530 Ne. Glen Oak Ave.",
         # Vermilion County
-            # Lakeview Medical Center/OSF Sacred Heart
+            # Lakeview Medical Center
             "812 Logan Ave, Presence United Samaritans",
             "812 N Logan Ave",
             "812 N. Logan",
             # VA Illiana Health Care System 
             "1900 E Main St"
     )
-```
+    
+    df1 <-
+        incidents_raw_df |> 
+        # Without address filter --> 12176 incidents
+        # With Cook address filter --> 11517 incidents
+        filter(
+            !(IN_Street %in% hospital_address_variations)
+        ) |> 
+        filter(!is.na(INTPTLAT) & !is.na(INTPTLON)) |>
+        select(
+            status = Status,
+            person_of_interest = USER_Inves, 
+            victim = USER_Victi,
+            date = USER_Repor,
+            allegation = USER_Alleg,
+            judgement_of_alleg = USER_All_1,
+            city = IN_City,
+            lat = INTPTLAT, 
+            long = INTPTLON
+        ) |> 
+        mutate(
+            lat = as.numeric(lat),
+            long = as.numeric(long)
+        )
+    
+    df2 <-
+        peoria_vermilion_incidents_post_geocode_raw_df |> 
+        filter(
+            !(IN_Street %in% hospital_address_variations)
+        ) |> 
+        select(
+            status = Status,
+            person_of_interest = USER_Inves, 
+            victim = USER_Victi,
+            date = USER_Repor,
+            allegation = USER_Alleg,
+            judgement_of_alleg = USER_All_1,
+            address = IN_Street,
+            city = IN_City,
+            lat = `Script Component Single Row Address.Y`, 
+            long = `Script Component Single Row Address.X`
+        )
+    
+    df3 <- bind_rows(df1, df2)
+    
+    
+    df4 <-
+        df3 |> 
+        filter(judgement_of_alleg %in% c("Indicated", "Indicated Allowed")) |> 
+        separate(
+            allegation,
+            into = c("allegation_code", "allegation_desc"),
+            sep = "-",
+            extra = "merge"
+        ) |> 
+        mutate(
+            allegation_code_num = 
+                as.numeric(
+                    str_extract(allegation_code, "[:digit:]+")
+                ),
+            abuse_or_neglect =
+                case_when(
+                    allegation_code_num %in% 1:40 ~ "abuse",
+                    allegation_code_num %in% 51:90 ~ "neglect"
+                ),
+            spatiotemporal_id = 
+                paste(
+                    date, lat, long,
+                    sep = ":"
+                )
+        )
+    
+    df5 <-
+        df4 |> 
+        group_by(spatiotemporal_id) |> 
+        summarize(
+            abuse = any(str_detect(abuse_or_neglect, "abuse")),
+            neglect = any(str_detect(abuse_or_neglect, "neglect"))
+        ) |> 
+        right_join(df4) |> 
+        group_by(
+            spatiotemporal_id, date, lat, long,
+            abuse, neglect
+        ) |>
+        nest() |>
+        st_as_sf(
+            coords = c("long", "lat"),
+            crs = 4269
+        ) #|>
+        #st_transform(crs = 4326)
 
-
-```{r}
-incidents_raw |> 
-    filter(IN_City == "Danville") |> 
-    #filter(!(IN_Street %in% hospital_address_variations)) |> 
-    group_by(IN_Street) |> 
-    summarise(n = n()) |> 
-    arrange(desc(n)) |> 
-    view()
-```
-
-# Maps
-
-```{r}
-source("R/map_dcfs_incidents_by_census_tract.R")
-
-map_dcfs_incidents_by_census_tract(peoria_incidents_per_census_tract, 40.783333, -89.766667, "Peoria")
-```
-
-```{r}
-map_dcfs_incidents_by_census_tract(cook_incidents_per_census_tract, 41.816544, -87.749500, "Cook")
-```
-
-```{r}
-map_dcfs_incidents_by_census_tract(vermilion_incidents_per_census_tract, 40.124481, -87.630019, "Vermilion")
-```
-
-```{r}
-htmlwidgets::saveWidget(
-    map_dcfs_incidents_by_census_tract(cook_incidents_per_census_tract, 41.816544, -87.749500, "Cook"),
-    "test.html"
-)
-```
-
+    return(df5)
+    
+}
