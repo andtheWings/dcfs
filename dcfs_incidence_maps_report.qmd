@@ -1,0 +1,125 @@
+---
+title: "DCFS Case Incidence in Select Illinois Counties"
+author: "Daniel P. Hall Riggins"
+date: today
+format: 
+    html:
+        embed-resources: true
+code-overflow: wrap
+code-fold: true
+---
+
+## Introduction
+
+The following maps display the incidence of child abuse/neglect cases [reported to Illinois Department of Children & Family Services](https://childabuse.illinois.gov/). Incidence is broken down to the census tract level for Cook, Peoria, and Vermilion counties from 2016-2021.
+
+Briefly, we tallied the number of cases for each census tract and then divided by the census-estimated population. We filtered out all cases whose addresses were reported at healthcare or childcare facilities as we were more interested in primary addresses for cases. Because incidence is aggregated into census tracts, privacy remains preserved since information about single addresses is obscured.
+
+![Image source: The Parent and Child Center of Tulsa](cap-month.jpg)
+https://www.parentchildcenter.org/april-is-child-abuse-prevention-and-awareness-month/
+
+```{r}
+#| echo: false
+#| output: false
+library(tidyverse)
+library(sf)
+library(leaflet)
+
+map_dcfs_incidents_by_census_tract <- 
+    function(
+        incidents_per_census_tract_sf,
+        lat_num, lng_num,
+        county_char
+    ){
+        dcfs_palette <-
+            colorNumeric(
+                palette = "magma",
+                domain = incidents_per_census_tract_sf$rate_incidents,
+                reverse = TRUE,
+            )
+        
+        map1 <-
+            incidents_per_census_tract_sf |> 
+            st_transform(4326) |> 
+            leaflet() |> 
+            addProviderTiles("CartoDB.Positron") |> 
+            # Center and zoom the map to Cook County
+            setView(lat = lat_num, lng = lng_num, zoom = 10) |> 
+            # Add button to enable fullscreen map
+            leaflet.extras::addFullscreenControl() |> 
+            addPolygons(
+                color = "gray",
+                weight = 0.5,
+                # Color according to palette above
+                fillColor = ~dcfs_palette(rate_incidents),
+                # Group polygons by number of deaths for use in the layer control
+                group = ~ count_incidents,
+                # Make slightly transparent
+                fillOpacity = 0.5,
+                label = "Click for more info!",
+                # Click on the polygon to get info
+                popup = ~ paste0(
+                    "<h4>Census Tract Info:</h4>",
+                    "<b>FIPS ID</b>: ", as.character(GEOID),"<br/>",
+                    "<b>Count</b>: ", as.character(count_incidents), " incident(s) <br/>",
+                    "<b>Population</b>: ", as.character(estimate), " people <br/>",
+                    "<b>Rate</b>: ", as.character(rate_incidents), " incidents per 1,000 people"
+                )
+            ) |> 
+            #Add legend
+            addLegend(
+                title = 
+                    paste0(
+                        "Rate of DCFS Abuse <br> or Neglect cases <br> per 1,000 people <br> in Each Census Tract <br> of ",
+                        county_char,
+                        " County, IL <br> from 2016-2021"
+                    ),
+                values = ~ rate_incidents,
+                pal = dcfs_palette,
+                position = "topright"
+            )
+        
+        return(map1)
+    }
+
+cook_incidents_per_census_tract <- readRDS(here::here("data", "cook_incidents_per_census_tract.RDS"))
+peoria_incidents_per_census_tract <- readRDS(here::here("data", "peoria_incidents_per_census_tract.RDS"))
+vermilion_incidents_per_census_tract <- readRDS(here::here("data", "vermilion_incidents_per_census_tract.RDS"))
+
+```
+
+## Cook County
+
+*Note: Use the scrollwheel on your mouse to zoom in and out. Click, hold, and drag to pan around the map. Single-click on any census tract to get more contextual information.*
+
+```{r}
+#| echo: false
+map_dcfs_incidents_by_census_tract(
+                cook_incidents_per_census_tract, 
+                41.816544, -87.749500, 
+                "Cook"
+            )
+```
+
+## Peoria County
+
+```{r}
+#| echo: false
+map_dcfs_incidents_by_census_tract(
+                peoria_incidents_per_census_tract, 
+                40.783333, -89.766667, 
+                "Peoria"
+            )
+```
+
+## Vermilion County
+
+```{r}
+#| echo: false
+map_dcfs_incidents_by_census_tract(
+                vermilion_incidents_per_census_tract, 
+                40.124481, -87.630019, 
+                "Vermilion"
+            )
+```
+

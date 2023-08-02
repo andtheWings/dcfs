@@ -17,6 +17,18 @@ tar_load_everything()
 ```
 
 ```{r}
+saveRDS(peoria_incidents_per_census_tract, "data/peoria_incidents_per_census_tract.RDS")
+saveRDS(vermilion_incidents_per_census_tract, "data/vermilion_incidents_per_census_tract.RDS")
+saveRDS(cook_incidents_per_census_tract, "data/cook_incidents_per_census_tract.RDS")
+```
+
+
+```{r}
+tar_visnetwork()
+```
+
+
+```{r}
 hospital_address_variations <- c(
         # Cook County
             # Alexian Brothers Behavioral Health Hospital
